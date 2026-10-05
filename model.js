@@ -1,7 +1,7 @@
 export const isDemoSuperuser = userId => userId === 'saq-demo-superuser';
 export const pendingTasks = (state,userId) => state.tasks.filter(t=>(isDemoSuperuser(userId)||t.recipientId===userId) && t.status==='pending');
 export const visibleNotifications = (state,userId) => state.notifications.filter(n=>(isDemoSuperuser(userId)||n.recipientId===userId)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id));
-// Filter before calling this helper. Clamp after reading/archiving the last item.
+// Filter before calling this helper. Clamp after reading the last item.
 export function paginateNotifications(list,page=1,pageSize=10) {
   const size=[10,25,50].includes(Number(pageSize))?Number(pageSize):10;
   const total=list.length,totalPages=Math.max(1,Math.ceil(total/size));
@@ -9,7 +9,7 @@ export function paginateNotifications(list,page=1,pageSize=10) {
   const start=(current-1)*size;
   return {items:list.slice(start,start+size),page:current,pageSize:size,total,totalPages,from:total?start+1:0,to:Math.min(start+size,total)};
 }
-export const unreadCount = (state,userId) => visibleNotifications(state,userId).filter(n=>!n.readAt&&!n.archivedAt).length;
+export const unreadCount = (state,userId) => visibleNotifications(state,userId).filter(n=>!n.readAt).length;
 export const canOpen = (state,entityId,userId) => Boolean(state.entities.find(e=>e.id===entityId && (isDemoSuperuser(userId)||e.allowedUserIds.includes(userId))));
 export function needsAction(state,notification) {
   return Boolean(state.tasks.find(t=>t.id===notification.taskId && t.recipientId===notification.recipientId && t.status==='pending'));
@@ -19,17 +19,9 @@ export function readNotification(state,id,userId,at=new Date().toISOString()) {
   if(n) n.readAt=at;
   return state;
 }
-export function archiveNotification(state,id,userId,at=new Date().toISOString()) {
-  const n=state.notifications.find(n=>n.id===id&&(isDemoSuperuser(userId)||n.recipientId===userId));
-  if(!n) throw Error('Уведомление недоступно.');
-  if(needsAction(state,n)) throw Error('Сначала выполните поручение. Прочтение уведомления не завершает его.');
-  n.archivedAt=n.archivedAt?null:at;
-  if(n.archivedAt)n.readAt ||= at;
-  return state;
-}
 export function addNotification(state,data) {
   if(state.notifications.some(n=>n.eventId===data.eventId && n.recipientId===data.recipientId))return;
-  state.notifications.push({id:`notice-new-${state.sequence++}`,readAt:null,archivedAt:null,...data});
+  state.notifications.push({id:`notice-new-${state.sequence++}`,readAt:null,...data});
 }
 const actions = {
   approve:['approve','return','reject'], 'approve-final':['approve','return','reject'],

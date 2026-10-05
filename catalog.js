@@ -1,9 +1,9 @@
 export const modules = {
-  sur: {label:'СУР', full:'Система управления рисками', icon:'chart', color:'purple'},
-  evga: {label:'ВГА', full:'Внутренний государственный аудит', icon:'file', color:'blue'},
-  sva: {label:'СВА', full:'Службы внутреннего аудита', icon:'shield', color:'teal'},
-  prof: {label:'Проф. контроль', full:'Профилактический контроль', icon:'tasks', color:'amber'},
-  objections: {label:'Возражения', full:'Рассмотрение возражений и жалоб', icon:'users', color:'rose'},
+  sur: {label:'СУР', full:'Система управления рисками', icon:'chart'},
+  evga: {label:'ВГА', full:'Внутренний государственный аудит', icon:'file'},
+  sva: {label:'СВА', full:'Службы внутреннего аудита', icon:'shield'},
+  prof: {label:'Проф. контроль', full:'Профилактический контроль', icon:'tasks'},
+  objections: {label:'Возражения', full:'Рассмотрение возражений и жалоб', icon:'users'},
 };
 export const categories = {
   approval:'Согласование', signing:'Подписание / утверждение', revision:'Доработка',

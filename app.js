@@ -77,7 +77,6 @@ function notificationRow(n,compact=false){
   const task=state.tasks.find(t=>t.id===n.taskId),active=needsAction(state,n),unread=!n.readAt;
   const link=`<a class="document-link" href="#/document/${n.entityId}" data-action="open-notice" data-id="${n.id}" aria-label="Перейти к документу: ${esc(n.body)}">Перейти ${icon('arrow')}</a>`;
   return `<article class="notification-row ${unread?'unread':''} ${compact?'compact':''}" data-notice-id="${n.id}">
-    <div class="event-icon">${icon(n.category==='deadline'?'clock':n.category==='result'?'check':n.category==='revision'?'return':modules[n.module].icon)}</div>
     <div class="notification-body"><div class="notification-heading"><h3 class="notification-title">${esc(notificationTitle(n))}</h3>${moduleBadge(n.module)}${unread?'<span class="unread-dot" aria-label="Непрочитано"></span>':''}</div>
     <details class="notification-message"><summary title="Развернуть или свернуть текст уведомления"><span class="notification-text">${esc(n.body)}</span>${icon('down')}</summary></details>
     <div class="notification-meta"><span>${esc(person(n.actorId))}</span><span aria-hidden="true">·</span><time datetime="${n.createdAt}" title="${fullDate(n.createdAt)} (Астана, UTC+5)">${shortDate(n.createdAt)}</time>${!compact&&task?`${active&&task.dueAt?`<span class="due ${isOverdue(task)?'overdue':''}">${isOverdue(task)?'Срок истёк':'До'} ${fullDate(task.dueAt)}</span>`:''}`:''}${!compact&&n.relatedModule?`<span class="related">Связано с ${modules[n.relatedModule].label}</span>`:''}${compact?link:''}</div></div>

@@ -1,6 +1,6 @@
 import { modules, categories, catalog } from './catalog.js';
 import { users, makeSeed, ensureDemoHistory } from './data.js';
-import { pendingTasks, visibleNotifications, paginateNotifications, unreadCount, needsAction, canOpen, readNotification, archiveNotification, actOnTask } from './model.js';
+import { pendingTasks, visibleNotifications, paginateNotifications, unreadCount, needsAction, canOpen, readNotification, actOnTask } from './model.js';
 import { icon } from './icons.js';
 
 const KEY='saq.notifications.prototype.v1';
@@ -32,7 +32,7 @@ const shortDate=(value)=>{
 const isOverdue=t=>t.status==='pending'&&t.dueAt&&new Date(t.dueAt)<new Date();
 const actionNames={approve:'Согласование','approve-final':'Утверждение',acknowledge:'Ознакомление','review-selection':'Рассмотрение отбора',review:'Рассмотрение',respond:'Подготовка ответа',revise:'Доработка',attendance:'Подтверждение участия'};
 const statusNames={pending:'Требует действия',completed:'Выполнено',returned:'Возвращено',rejected:'Отклонено',cancelled:'Отменено',waiting:'Ожидает этапа'};
-const moduleBadge=(id)=>`<span class="module-badge ${modules[id]?.color || ''}">${esc(modules[id]?.label || 'Все модули')}</span>`;
+const moduleBadge=(id)=>`<span class="module-badge">${esc(modules[id]?.label || 'Все модули')}</span>`;
 const notify=(message)=>{
   const el=document.querySelector('#toast'); el.innerHTML=icon('check')+`<span>${esc(message)}</span>`; el.classList.add('visible');
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),4500);
@@ -45,7 +45,7 @@ function openEntity(entityId,noticeId){
 }
 function stats(){
   const tasks=pendingTasks(state,user().id);
-  return `<div class="stats-line"><span>${icon('mail')}<strong>${unreadCount(state,user().id)}</strong> непрочитанных</span><button data-action="go-tasks">${icon('tasks')}<strong>${tasks.length}</strong> требуют действия</button><span class="${tasks.some(isOverdue)?'danger-text':''}">${icon('clock')}<strong>${tasks.filter(isOverdue).length}</strong> просрочено</span></div>`;
+  return `<div class="stats-line"><span>${icon('mail')}<strong>${unreadCount(state,user().id)}</strong> непрочитанных</span><span>${icon('clock')}<strong>${tasks.filter(isOverdue).length}</strong> просрочено</span></div>`;
 }
 const moduleNames={sur:'Система управления рисками',evga:'Внутренний государственный аудит',sva:'Служба внутреннего аудита',prof:'Профилактический контроль',objections:'Возражения'};
 function currentEntity(){return state.entities.find(e=>e.id===decodeURIComponent(location.hash.split('/')[2]?.split('?')[0]||''));}
@@ -72,17 +72,17 @@ function notificationRow(n,compact=false){
   const task=state.tasks.find(t=>t.id===n.taskId),active=needsAction(state,n),unread=!n.readAt;
   const link=`<a class="document-link" href="#/document/${n.entityId}" data-action="open-notice" data-id="${n.id}" aria-label="Перейти к документу: ${esc(n.body)}">Перейти ${icon('arrow')}</a>`;
   return `<article class="notification-row ${unread?'unread':''} ${compact?'compact':''}" data-notice-id="${n.id}">
-    <div class="event-icon ${modules[n.module].color}">${icon(n.category==='deadline'?'clock':n.category==='result'?'check':n.category==='revision'?'return':modules[n.module].icon)}</div>
+    <div class="event-icon">${icon(n.category==='deadline'?'clock':n.category==='result'?'check':n.category==='revision'?'return':modules[n.module].icon)}</div>
     <div class="notification-body"><div class="notification-heading"><h3 class="notification-title">${esc(notificationTitle(n))}</h3>${moduleBadge(n.module)}${unread?'<span class="unread-dot" aria-label="Непрочитано"></span>':''}</div>
     <details class="notification-message"><summary title="Развернуть или свернуть текст уведомления"><span class="notification-text">${esc(n.body)}</span>${icon('down')}</summary></details>
-    <div class="notification-meta"><span>${esc(person(n.actorId))}</span><span aria-hidden="true">·</span><time datetime="${n.createdAt}" title="${fullDate(n.createdAt)} (Астана, UTC+5)">${shortDate(n.createdAt)}</time>${!compact&&task?`<span class="state-pill ${active?'pending':''}">${active?'Требует действия':statusNames[task.status]}</span>${active&&task.dueAt?`<span class="due ${isOverdue(task)?'overdue':''}">${isOverdue(task)?'Срок истёк':'До'} ${fullDate(task.dueAt)}</span>`:''}`:''}${!compact&&n.relatedModule?`<span class="related">Связано с ${modules[n.relatedModule].label}</span>`:''}${compact?link:''}</div></div>
-    ${!compact?`<div class="notification-actions">${link}<div class="row-tools"><button class="icon-button" data-action="toggle-read" data-id="${n.id}" title="${unread?'Отметить прочитанным':'Отметить непрочитанным'}" aria-label="${unread?'Отметить прочитанным':'Отметить непрочитанным'}: ${esc(n.title)}">${icon(unread?'mail':'inbox')}</button><button class="icon-button" data-action="archive" data-id="${n.id}" ${active?'disabled':''} title="${active?'В архив после выполнения поручения':n.archivedAt?'Вернуть из архива':'В архив'}" aria-label="${n.archivedAt?'Вернуть из архива':'В архив'}: ${esc(n.title)}">${icon(n.archivedAt?'return':'archive')}</button></div></div>`:''}
+    <div class="notification-meta"><span>${esc(person(n.actorId))}</span><span aria-hidden="true">·</span><time datetime="${n.createdAt}" title="${fullDate(n.createdAt)} (Астана, UTC+5)">${shortDate(n.createdAt)}</time>${!compact&&task?`${active&&task.dueAt?`<span class="due ${isOverdue(task)?'overdue':''}">${isOverdue(task)?'Срок истёк':'До'} ${fullDate(task.dueAt)}</span>`:''}`:''}${!compact&&n.relatedModule?`<span class="related">Связано с ${modules[n.relatedModule].label}</span>`:''}${compact?link:''}</div></div>
+    ${!compact?`<div class="notification-actions">${link}<div class="row-tools"><button class="icon-button" data-action="toggle-read" data-id="${n.id}" title="${unread?'Отметить прочитанным':'Отметить непрочитанным'}" aria-label="${unread?'Отметить прочитанным':'Отметить непрочитанным'}: ${esc(n.title)}">${icon(unread?'mail':'inbox')}</button></div></div>`:''}
     </article>`;
 }
 function bellPanel(){
-  const all=visibleNotifications(state,user().id).filter(n=>!n.archivedAt);
-  const list=all.filter(n=>bellTab==='unread'?!n.readAt:bellTab==='action'?needsAction(state,n):true).slice(0,5);
-  return `<section id="bell-panel" class="bell-panel" aria-label="Последние уведомления"><div class="bell-heading"><h2>Уведомления <span>${unreadCount(state,user().id)}</span></h2><button class="icon-button" data-action="bell-close" aria-label="Закрыть уведомления">${icon('close')}</button></div><div class="bell-tabs">${[['unread','Непрочитанные'],['all','Все'],['action','Требуют действия']].map(([id,label])=>`<button data-action="bell-tab" data-id="${id}" aria-pressed="${bellTab===id}" class="${bellTab===id?'active':''}">${label}</button>`).join('')}</div><div class="bell-feed">${list.length?list.map(n=>notificationRow(n,true)).join(''):'<div class="empty compact-empty">'+icon('check')+'<h3>Здесь пока пусто</h3><p>Подходящих уведомлений нет.</p></div>'}</div><div class="bell-footer"><button data-action="read-all" class="text-button">${icon('double')}Все прочитаны</button><button data-action="all-notices" class="text-button">Все уведомления ${icon('arrow')}</button></div></section>`;
+  const all=visibleNotifications(state,user().id);
+  const list=all.filter(n=>bellTab==='unread'?!n.readAt:true).slice(0,5);
+  return `<section id="bell-panel" class="bell-panel" aria-label="Последние уведомления"><div class="bell-heading"><h2>Уведомления <span>${unreadCount(state,user().id)}</span></h2><button class="icon-button" data-action="bell-close" aria-label="Закрыть уведомления">${icon('close')}</button></div><div class="bell-tabs">${[['unread','Непрочитанные'],['all','Все']].map(([id,label])=>`<button data-action="bell-tab" data-id="${id}" aria-pressed="${bellTab===id}" class="${bellTab===id?'active':''}">${label}</button>`).join('')}</div><div class="bell-feed">${list.length?list.map(n=>notificationRow(n,true)).join(''):'<div class="empty compact-empty">'+icon('check')+'<h3>Здесь пока пусто</h3><p>Подходящих уведомлений нет.</p></div>'}</div><div class="bell-footer"><button data-action="read-all" class="text-button">${icon('double')}Все прочитаны</button><button data-action="all-notices" class="text-button">Все уведомления ${icon('arrow')}</button></div></section>`;
 }
 function filters(kind='notifications'){
   return `<div class="filters"><label class="search-field">${icon('search')}<input id="search" type="search" value="${esc(query)}" placeholder="${kind==='catalog'?'Найти событие, получателя или текст…':'Поиск по документу, тексту, отправителю…'}" aria-label="Поиск"></label><label class="filter-select"><select id="module-filter" aria-label="Модуль"><option value="all">Все модули</option>${Object.entries(modules).map(([id,m])=>`<option value="${id}" ${moduleFilter===id?'selected':''}>${m.label}</option>`).join('')}</select></label><label class="filter-select"><select id="category-filter" aria-label="Тип уведомления"><option value="all">Все типы</option>${Object.entries(categories).map(([id,l])=>`<option value="${id}" ${categoryFilter===id?'selected':''}>${l}</option>`).join('')}</select></label>${query||moduleFilter!=='all'||categoryFilter!=='all'?'<button class="text-button" data-action="reset-filters">Сбросить</button>':''}</div>`;
@@ -90,10 +90,10 @@ function filters(kind='notifications'){
 function notificationPage(){
   const all=visibleNotifications(state,user().id);
   return `<div class="page-heading"><div><h2>Уведомления</h2></div><button class="button secondary" data-action="read-all">${icon('double')}Отметить все прочитанными</button></div>${stats()}
-    <section class="panel feed-panel"><div class="tabs">${[['unread','Непрочитанные',unreadCount(state,user().id)],['all','Все',all.filter(n=>!n.archivedAt).length],['action','Требуют действия',all.filter(n=>needsAction(state,n)).length],['archive','Архив',all.filter(n=>n.archivedAt).length]].map(([id,label,count])=>`<button class="${tab===id?'active':''}" data-action="tab" data-id="${id}" aria-pressed="${tab===id}">${label}<span>${count}</span></button>`).join('')}</div>${filters()}<div id="results">${notificationResults()}</div></section><div class="page-footnote">${icon('shield')}Доступны только сообщения, адресованные выбранному пользователю. Время — Астана, UTC+5.</div>`;
+    <section class="panel feed-panel"><div class="tabs">${[['unread','Непрочитанные',unreadCount(state,user().id)],['all','Все',all.length]].map(([id,label,count])=>`<button class="${tab===id?'active':''}" data-action="tab" data-id="${id}" aria-pressed="${tab===id}">${label}<span>${count}</span></button>`).join('')}</div>${filters()}<div id="results">${notificationResults()}</div></section><div class="page-footnote">${icon('shield')}Доступны только сообщения, адресованные выбранному пользователю. Время — Астана, UTC+5.</div>`;
 }
 function notificationResults(){
-  const list=visibleNotifications(state,user().id).filter(n=>tab==='archive'?n.archivedAt:!n.archivedAt).filter(n=>tab==='unread'?!n.readAt:tab==='action'?needsAction(state,n):true)
+  const list=visibleNotifications(state,user().id).filter(n=>tab==='unread'?!n.readAt:true)
     .filter(n=>(moduleFilter==='all'||n.module===moduleFilter)&&(categoryFilter==='all'||n.category===categoryFilter))
     .filter(n=>`${notificationTitle(n)} ${n.title} ${n.body} ${person(n.actorId)}`.toLocaleLowerCase('ru').includes(query.trim().toLocaleLowerCase('ru')));
   const result=paginateNotifications(list,noticePage,noticePageSize);
@@ -174,13 +174,13 @@ function catalogResults(){
   const list=catalog.filter(c=>(moduleFilter==='all'||c.module===moduleFilter||c.module==='all')&&(categoryFilter==='all'||c.category===categoryFilter)&&Object.values(c).join(' ').toLowerCase().includes(query.toLowerCase()));
   return list.length?list.map(c=>`<details class="catalog-item"><summary><code>${c.id}</code>${c.module==='all'?'<span class="module-badge">Общее</span>':moduleBadge(c.module)}<strong>${esc(c.event)}</strong><span class="evidence ${c.evidence==='new'?'new':''}">${c.evidence==='new'?'Новый сценарий':'Процесс в макете'}</span>${icon('down')}</summary><div class="catalog-detail"><dl><div><dt>От кого</dt><dd>${esc(c.actor)}</dd></div><div><dt>Кому</dt><dd>${esc(c.recipient)}</dd></div><div><dt>Тип</dt><dd>${categories[c.category]}</dd></div><div><dt>Поручение</dt><dd>${esc(c.task)}</dd></div></dl><div class="template-card"><span>ШАБЛОН УВЕДОМЛЕНИЯ</span><h3>${esc(c.title)}</h3><p>${esc(c.body)}</p><div>${esc(c.action)} ${icon('arrow')}</div></div></div></details>`).join(''):empty('Событий не найдено','Измените фильтр или поисковый запрос.');
 }
-function rulesPage(){return `<div class="breadcrumb">Модель SAQ <span>/</span> Как это работает</div><div class="page-heading"><div><h1>Один процесс. Два способа открыть.</h1><p>Уведомление привлекает внимание, поручение хранит обязательное действие.</p></div></div><div class="rules-grid"><section class="panel rule-card">${icon('bell')}<h2>Уведомления</h2><p>Что произошло, с каким документом, кто отправил и когда. В колокольчике — последние 5 сообщений, в общем разделе — весь список и архив.</p><p>Счётчик означает количество непрочитанных сообщений.</p></section><section class="panel rule-card">${icon('tasks')}<h2>Поручения</h2><p>Что нужно сделать, по какому документу и в какой срок. Информационные результаты не создают поручений.</p><p>Счётчик означает количество открытых действий.</p></section></div><section class="panel rules-list"><h2>Правила работы</h2>${[
+function rulesPage(){return `<div class="breadcrumb">Модель SAQ <span>/</span> Как это работает</div><div class="page-heading"><div><h1>Один процесс. Два способа открыть.</h1><p>Уведомление привлекает внимание, поручение хранит обязательное действие.</p></div></div><div class="rules-grid"><section class="panel rule-card">${icon('bell')}<h2>Уведомления</h2><p>Что произошло, с каким документом, кто отправил и когда. В колокольчике — последние 5 сообщений, в общем разделе — весь список уведомлений.</p><p>Счётчик означает количество непрочитанных сообщений.</p></section><section class="panel rule-card">${icon('tasks')}<h2>Поручения</h2><p>Что нужно сделать, по какому документу и в какой срок. Информационные результаты не создают поручений.</p><p>Счётчик означает количество открытых действий.</p></section></div><section class="panel rules-list"><h2>Правила работы</h2>${[
   ['Модуль и тип — разные признаки','«Возражения» — источник. «Согласование», «Заседание» или «Результат» — смысл сообщения. Если событие затрагивает ВГА, дополнительно показывается связь с исходным мероприятием.'],
   ['Единый переход','Из уведомления и поручения открывается тот же документ, нужная редакция и доступное пользователю действие. Если назначение отменено, история остаётся, а выполнить его нельзя.'],
   ['Прочитано — ещё не выполнено','Открытие сообщения меняет только его прочитанность. Ознакомление, решение, ответ на опрос и подписание фиксируются отдельными действиями.'],
   ['Каждому — свои сообщения','Получатель определяется по назначению, организации, области данных и действующему этапу. Роль сама по себе не означает рассылку всем сотрудникам с этой ролью.'],
   ['Обратная связь отправителю','Инициатор получает итог, возврат, отказ или подтверждение ознакомления. Отправитель СУР видит результаты регионов и завершение общего рассмотрения.'],
-  ['Хранение','В рабочей SAQ нужен единый серверный реестр событий и личных уведомлений. Документы и поручения остаются в своих процессах. Архив — состояние записи, а не удаление истории.'],
+  ['Хранение','В рабочей SAQ нужен единый серверный реестр событий и личных уведомлений. Документы и поручения остаются в своих процессах. Прочитанные сообщения сохраняются во вкладке «Все».'],
   ['Каналы','Первый этап — кабинет SAQ и колокольчик во всех модулях. Почта может дублировать уведомление со ссылкой после настройки. СМС и push не нужны для первого макета.'],
   ['Без лишнего шума','Сохранение черновика не отправляет уведомлений. Повторная доставка события не создаёт дубль. Напоминание ссылается на существующее поручение.'],
   ['Сроки','Срок берётся из документа и маршрута. Часовой пояс показывается явно. Рабочие дни и переносы рассчитывает бизнес-процесс, а не текст уведомления.'],
@@ -215,7 +215,6 @@ document.addEventListener('click',event=>{
   if(action==='mobile-menu'){mobileNav=!mobileNav;render();}
   if(action==='sidebar-toggle'){sidebarExpanded=!sidebarExpanded;try{localStorage.setItem('saq.notifications.sidebar.expanded',String(sidebarExpanded));}catch{}render();}
   if(action==='all-notices'){tab='all';noticePage=1;moduleFilter='all';categoryFilter='all';query='';navigate('notifications');}
-  if(action==='go-tasks'){taskTab='incoming';navigate('tasks');}
   if(action==='tab'){tab=id;noticePage=1;render();}
   if(action==='notice-page'){noticePage=Number(id);refreshNoticePage(true);}
   if(action==='task-tab'){taskTab=id;taskStatus='all';render();}
@@ -223,12 +222,11 @@ document.addEventListener('click',event=>{
   if(action==='open-notice'){const n=state.notifications.find(n=>n.id===id&&n.recipientId===user().id);if(n)openEntity(n.entityId,n.id);}
   if(action==='open-task'){const t=state.tasks.find(t=>t.id===id);if(t)openEntity(t.entityId);}
   if(action==='toggle-read'){const n=state.notifications.find(n=>n.id===id&&n.recipientId===user().id);if(n)n.readAt=n.readAt?null:new Date().toISOString();save();render();}
-  if(action==='archive'){try{archiveNotification(state,id,user().id);save();render();}catch(error){notify(error.message);}}
   if(action==='read-all'){const now=new Date().toISOString();visibleNotifications(state,user().id).forEach(n=>n.readAt ||= now);save();render();notify('Уведомления отмечены прочитанными. Открытые поручения сохранены.');}
   if(action==='decision'&&page()==='document'&&state.tasks.find(t=>t.id===id)?.entityId===currentEntity()?.id)decisionDialog(id,decision);
   if(action==='close-dialog')document.querySelector('#decision-dialog').close();
   if(action==='reset-demo'){
-    const dlg=document.querySelector('#decision-dialog');dlg.innerHTML='<form id="reset-form"><div class="dialog-heading"><h2>Восстановить примеры?</h2></div><p>Ваши демонстрационные решения, прочтения и архив будут сброшены.</p><div class="dialog-actions"><button type="button" class="button secondary" data-action="close-dialog">Отмена</button><button class="button primary" type="submit">Восстановить</button></div></form>';dlg.showModal();
+    const dlg=document.querySelector('#decision-dialog');dlg.innerHTML='<form id="reset-form"><div class="dialog-heading"><h2>Восстановить примеры?</h2></div><p>Ваши демонстрационные решения и прочтения будут сброшены.</p><div class="dialog-actions"><button type="button" class="button secondary" data-action="close-dialog">Отмена</button><button class="button primary" type="submit">Восстановить</button></div></form>';dlg.showModal();
   }
 });
 document.addEventListener('submit',event=>{

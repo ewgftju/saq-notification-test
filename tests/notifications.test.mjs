@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeSeed } from '../data.js';
 import { catalog } from '../catalog.js';
-import { pendingTasks, visibleNotifications, unreadCount, needsAction, canOpen, readNotification, archiveNotification, addNotification, actOnTask } from '../model.js';
+import { pendingTasks, visibleNotifications, unreadCount, needsAction, canOpen, readNotification, addNotification, actOnTask } from '../model.js';
 const seed=()=>makeSeed(new Date('2026-10-05T04:00:00Z'));
 const at='2026-10-05T05:00:00Z';
 
@@ -70,12 +70,14 @@ test('Deduplication uses event and recipient, allowing individual state',()=>{
   addNotification(s,{...n,id:'duplicate'});assert.equal(s.notifications.length,count);
   addNotification(s,{...n,recipientId:'author'});assert.equal(s.notifications.length,count+1);
 });
-test('Active action cannot be hidden in archive; completion permits archive',()=>{
-  const s=seed();assert.throws(()=>archiveNotification(s,'notice-audit-report','subject'),/выполните/);
-  const next=actOnTask(s,'task-audit-report','subject','acknowledge');
-  archiveNotification(next,'notice-audit-report','subject',at);
-  assert.ok(next.notifications.find(n=>n.id==='notice-audit-report').archivedAt);
-  assert.equal(needsAction(next,next.notifications.find(n=>n.id==='notice-audit-report')),false);
+test('Legacy archive flags do not hide notifications or affect their read state',()=>{
+  const s=seed(),n=s.notifications.find(n=>n.id==='notice-program');
+  const before=unreadCount(s,'reviewer');n.archivedAt=at;
+  assert.ok(visibleNotifications(s,'reviewer').some(item=>item.id===n.id));
+  assert.equal(unreadCount(s,'reviewer'),before);
+  readNotification(s,n.id,'reviewer',at);
+  assert.equal(unreadCount(s,'reviewer'),before-1);
+  assert.equal(s.tasks.find(t=>t.id==='task-program').status,'pending');
 });
 test('Only the notification recipient can mark it read',()=>{
   const s=seed();readNotification(s,'notice-program','subject',at);

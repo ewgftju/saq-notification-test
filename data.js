@@ -28,7 +28,7 @@ export function makeSeed(now = new Date()) {
       allowedUserIds:[...new Set([authorId,recipientId,...(extra.allowedUserIds || [])])]});
     if(task) tasks.push({id:taskId,entityId:id,recipientId,authorId,action,status,createdAt:at(hours),dueAt:dueHours===null?null:at(dueHours),version,routeId:`route-${id}`,step:0});
     notifications.push({id:`notice-${id}`,eventId:`event-${id}`,recipientId,actorId:authorId,module,category,entityId:id,taskId,version,
-      title:subject || 'Согласуйте документ',body:body || `${title} № ${number}. ${organization}.`,createdAt:at(hours),readAt:hours < -20 ? at(hours+1) : null,archivedAt:null,relatedModule});
+      title:subject || 'Согласуйте документ',body:body || `${title} № ${number}. ${organization}.`,createdAt:at(hours),readAt:hours < -20 ? at(hours+1) : null,relatedModule});
   };
 
   add({id:'program',module:'evga',title:'Программа аудита',number:'ВГА-2026-041',subject:'Согласуйте программу аудита',hours:-0.2,dueHours:8,
@@ -57,7 +57,7 @@ export function makeSeed(now = new Date()) {
       {id:'o4',name:'Учебный центр (пример)',risk:'Средний',include:true,reason:''},
       {id:'o5',name:'Управление культуры (пример)',risk:'Средний',include:true,reason:''},
     ]}});
-  notifications.push({id:'notice-sur-sent',eventId:'event-sur-sent',recipientId:'analyst',actorId:'analyst',module:'sur',category:'result',entityId:'sur-selection',taskId:null,version:'1',title:'Результаты СУР направлены',body:'Пакет № СУР-2026-010 направлен специалисту по перечню Атырауской области. Ожидается результат рассмотрения.',createdAt:at(-0.5),readAt:null,archivedAt:null});
+  notifications.push({id:'notice-sur-sent',eventId:'event-sur-sent',recipientId:'analyst',actorId:'analyst',module:'sur',category:'result',entityId:'sur-selection',taskId:null,version:'1',title:'Результаты СУР направлены',body:'Пакет № СУР-2026-010 направлен специалисту по перечню Атырауской области. Ожидается результат рассмотрения.',createdAt:at(-0.5),readAt:null});
   add({id:'audit-report',module:'evga',title:'Аудиторский отчёт',number:'АО-2026-041',recipientId:'subject',action:'acknowledge',category:'acknowledge',subject:'Ознакомьтесь с аудиторским отчётом',hours:-1,dueHours:48,content:'Подписанная редакция аудиторского отчёта по КГУ «Учебный центр». Доступны результаты аудита и приложения. Ознакомление фиксируется отдельным действием представителя организации.'});
   add({id:'audit-request',module:'evga',title:'Требование о представлении сведений',number:'ТР-2026-017',recipientId:'subject',action:'respond',category:'execution',subject:'Предоставьте сведения по требованию',hours:-4,dueHours:20,content:'Представьте сведения об исполнении договоров за проверяемый период. Ответ поступит назначенному аудитору для рассмотрения.'});
   for (const [id,title,number] of [['prof-act','Акт о назначении профилактического контроля','ПК-2026-019'],['prof-checklist','Проверочный лист','ПЛ-2026-019']])
@@ -68,12 +68,12 @@ export function makeSeed(now = new Date()) {
     content:`Заседание запланировано на ${date(48)} в 15:00 (Астана). Формат: видеоконференция. В повестке три обращения. Ответ о присутствии фиксируется отдельно от прочтения уведомления.`});
   add({id:'commission-position',module:'objections',title:'Материалы обращения для комиссии',number:'ВОЗ-2026-027-К',authorId:'secretary',recipientId:'commission',action:'review',category:'review',subject:'Представьте позицию по обращению',hours:-6,dueHours:36,content:'Изучите материалы обращения и представьте позицию по оспариваемым пунктам. Решение комиссии принимается в установленном процессе заседания.'});
   add({id:'obj-answer',module:'objections',title:'Ответ ДВГА на запрос',number:'ВОЗ-2026-022',authorId:'author',recipientId:'secretary',action:'review',category:'review',subject:'Поступил ответ ДВГА',hours:-2,dueHours:24,content:'ДВГА направил мотивированную позицию и материалы по обращению. Рассмотрите полноту ответа для подготовки материалов комиссии.'});
-  notifications.push({id:'notice-reminder',eventId:'reminder-obj-request',recipientId:'reviewer',actorId:'system',module:'objections',category:'deadline',entityId:'obj-request',taskId:'task-obj-request',version:'1',title:'Срок согласования запроса истёк',body:'Запрос № ВОЗ-2026-027 ожидает вашего решения. Поручение остаётся открытым.',createdAt:at(-0.05),readAt:null,archivedAt:null});
+  notifications.push({id:'notice-reminder',eventId:'reminder-obj-request',recipientId:'reviewer',actorId:'system',module:'objections',category:'deadline',entityId:'obj-request',taskId:'task-obj-request',version:'1',title:'Срок согласования запроса истёк',body:'Запрос № ВОЗ-2026-027 ожидает вашего решения. Поручение остаётся открытым.',createdAt:at(-0.05),readAt:null});
   return ensureDemoHistory({schemaVersion:1,createdAt:base.toISOString(),activeUserId:'reviewer',entities,tasks,notifications,preferences:{}, sequence:1});
 }
 
 // Add fictional completed documents so pagination is visible without creating
-// extra assignments. Existing reads, decisions and archive state are preserved.
+// extra assignments. Existing reads and decisions are preserved.
 export function ensureDemoHistory(state) {
   state.preferences ||= {};
   if(state.preferences.demoHistoryVersion===1)return state;
@@ -89,7 +89,7 @@ export function ensureDemoHistory(state) {
     const id=`demo-history-${String(i+1).padStart(2,'0')}`,number=`${prefix}-2026-${String(100+i).padStart(3,'0')}`;
     const createdAt=new Date(new Date(state.createdAt).getTime()-(36+i*7)*3600000).toISOString();
     if(!state.entities.some(e=>e.id===id))state.entities.push({id,module,title,number,organization:'КГУ «Учебный центр»',authorId:actorId,version:'1',status:'Завершено',allowedUserIds:['reviewer',actorId],content:`${message} Демонстрационный документ из истории уведомлений.`,history:[{at:createdAt,actorId,text:subject}]});
-    if(!state.notifications.some(n=>n.id===`notice-${id}`))state.notifications.push({id:`notice-${id}`,eventId:`event-${id}`,recipientId:'reviewer',actorId,module,category:'result',entityId:id,taskId:null,version:'1',title:subject,body:`${title} № ${number}. ${message}`,createdAt,readAt:i<14?null:createdAt,archivedAt:null});
+    if(!state.notifications.some(n=>n.id===`notice-${id}`))state.notifications.push({id:`notice-${id}`,eventId:`event-${id}`,recipientId:'reviewer',actorId,module,category:'result',entityId:id,taskId:null,version:'1',title:subject,body:`${title} № ${number}. ${message}`,createdAt,readAt:i<14?null:createdAt});
   }
   state.preferences.demoHistoryVersion=1;
   return state;

@@ -69,5 +69,28 @@ export function makeSeed(now = new Date()) {
   add({id:'commission-position',module:'objections',title:'Материалы обращения для комиссии',number:'ВОЗ-2026-027-К',authorId:'secretary',recipientId:'commission',action:'review',category:'review',subject:'Представьте позицию по обращению',hours:-6,dueHours:36,content:'Изучите материалы обращения и представьте позицию по оспариваемым пунктам. Решение комиссии принимается в установленном процессе заседания.'});
   add({id:'obj-answer',module:'objections',title:'Ответ ДВГА на запрос',number:'ВОЗ-2026-022',authorId:'author',recipientId:'secretary',action:'review',category:'review',subject:'Поступил ответ ДВГА',hours:-2,dueHours:24,content:'ДВГА направил мотивированную позицию и материалы по обращению. Рассмотрите полноту ответа для подготовки материалов комиссии.'});
   notifications.push({id:'notice-reminder',eventId:'reminder-obj-request',recipientId:'reviewer',actorId:'system',module:'objections',category:'deadline',entityId:'obj-request',taskId:'task-obj-request',version:'1',title:'Срок согласования запроса истёк',body:'Запрос № ВОЗ-2026-027 ожидает вашего решения. Поручение остаётся открытым.',createdAt:at(-0.05),readAt:null,archivedAt:null});
-  return {schemaVersion:1,createdAt:base.toISOString(),activeUserId:'reviewer',entities,tasks,notifications,preferences:{}, sequence:1};
+  return ensureDemoHistory({schemaVersion:1,createdAt:base.toISOString(),activeUserId:'reviewer',entities,tasks,notifications,preferences:{}, sequence:1});
+}
+
+// Add fictional completed documents so pagination is visible without creating
+// extra assignments. Existing reads, decisions and archive state are preserved.
+export function ensureDemoHistory(state) {
+  state.preferences ||= {};
+  if(state.preferences.demoHistoryVersion===1)return state;
+  const examples=[
+    ['evga','План аудита','ВГА','План аудита утверждён','director','Утверждённая редакция плана доступна для просмотра.'],
+    ['prof','Пакет для ЕРСОП','ПК','Пакет для ЕРСОП согласован','author','Согласование комплекта завершено. Итоговая редакция сохранена.'],
+    ['objections','Решение по возражению','ВОЗ','Рассмотрение возражения завершено','secretary','Решение комиссии и протокол приложены к материалам обращения.'],
+    ['sur','Результаты рассмотрения СУР','СУР','Результаты СУР рассмотрены','analyst','Регион завершил отбор. Решения о включении и исключении объектов доступны в своде.'],
+    ['sva','Заключение контроля качества СВА','КК-СВА','Заключение КК СВА согласовано','quality','Согласованное заключение сохранено в составе материалов контроля качества.'],
+  ];
+  for(let i=0;i<32;i++){
+    const [module,title,prefix,subject,actorId,message]=examples[i%examples.length];
+    const id=`demo-history-${String(i+1).padStart(2,'0')}`,number=`${prefix}-2026-${String(100+i).padStart(3,'0')}`;
+    const createdAt=new Date(new Date(state.createdAt).getTime()-(36+i*7)*3600000).toISOString();
+    if(!state.entities.some(e=>e.id===id))state.entities.push({id,module,title,number,organization:'КГУ «Учебный центр»',authorId:actorId,version:'1',status:'Завершено',allowedUserIds:['reviewer',actorId],content:`${message} Демонстрационный документ из истории уведомлений.`,history:[{at:createdAt,actorId,text:subject}]});
+    if(!state.notifications.some(n=>n.id===`notice-${id}`))state.notifications.push({id:`notice-${id}`,eventId:`event-${id}`,recipientId:'reviewer',actorId,module,category:'result',entityId:id,taskId:null,version:'1',title:subject,body:`${title} № ${number}. ${message}`,createdAt,readAt:i<14?null:createdAt,archivedAt:null});
+  }
+  state.preferences.demoHistoryVersion=1;
+  return state;
 }

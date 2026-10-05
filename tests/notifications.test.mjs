@@ -94,3 +94,43 @@ test('Catalog covers all five modules and template fields are present',()=>{
   assert.equal(new Set(catalog.map(e=>e.id)).size,catalog.length);
   for(const e of catalog)for(const k of ['event','actor','recipient','title','body','task','action'])assert.ok(e[k]);
 });
+
+test('Pagination keeps 1,003 notifications reachable with stable ordering and no overlap',async()=>{
+  const {paginateNotifications}=await import('../model.js');
+  const s={notifications:Array.from({length:1003},(_,i)=>({id:`n-${String(i).padStart(4,'0')}`,recipientId:'reviewer',createdAt:at}))};
+  const list=visibleNotifications(s,'reviewer');
+  const ids=[];
+  for(let page=1;page<=101;page++)ids.push(...paginateNotifications(list,page,10).items.map(n=>n.id));
+  assert.equal(ids.length,1003);assert.equal(new Set(ids).size,1003);
+  assert.deepEqual(ids,list.map(n=>n.id));
+  assert.deepEqual(visibleNotifications({notifications:[...s.notifications].reverse()},'reviewer'),list);
+  const last=paginateNotifications(list,101,10);
+  assert.equal(last.from,1001);assert.equal(last.to,1003);
+});
+test('Pagination clamps after removals, handles empty results and restricts page size',async()=>{
+  const {paginateNotifications}=await import('../model.js');
+  const list=Array.from({length:11},(_,i)=>i);
+  assert.equal(paginateNotifications(list,2).items.length,1);
+  const removed=paginateNotifications(list.slice(0,10),2);
+  assert.equal(removed.page,1);assert.equal(removed.items.length,10);
+  const empty=paginateNotifications([],8);
+  assert.deepEqual([empty.page,empty.from,empty.to,empty.total],[1,0,0,0]);
+  assert.equal(paginateNotifications(list,-3,10000).pageSize,10);
+  assert.equal(paginateNotifications(list,-3).page,1);
+  for(const size of [10,25,50])assert.equal(paginateNotifications(Array(100),1,size).items.length,size);
+});
+test('Filtering before pagination finds matches beyond the first page',async()=>{
+  const {paginateNotifications}=await import('../model.js');
+  const s=seed(),list=visibleNotifications(s,'reviewer').filter(n=>n.body.includes('СУР-2026-103'));
+  const result=paginateNotifications(list,4,10);
+  assert.equal(result.total,1);assert.equal(result.page,1);assert.equal(result.items[0].entityId,'demo-history-04');
+});
+test('Adding demo history preserves decisions, read state and assignments',async()=>{
+  const {ensureDemoHistory}=await import('../data.js');
+  const s=seed();readNotification(s,'notice-demo-history-01','reviewer',at);
+  const tasks=structuredClone(s.tasks),count=s.notifications.length;
+  delete s.preferences.demoHistoryVersion;ensureDemoHistory(s);ensureDemoHistory(s);
+  assert.deepEqual(s.tasks,tasks);assert.equal(s.notifications.length,count);
+  assert.equal(s.notifications.find(n=>n.id==='notice-demo-history-01').readAt,at);
+  assert.ok(s.notifications.filter(n=>n.id.startsWith('notice-demo-history-')).every(n=>canOpen(s,n.entityId,n.recipientId)));
+});

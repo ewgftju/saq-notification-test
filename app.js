@@ -1,6 +1,6 @@
 import { modules, categories, catalog } from './catalog.js';
-import { users, makeSeed } from './data.js';
-import { pendingTasks, visibleNotifications, unreadCount, needsAction, canOpen, readNotification, archiveNotification, actOnTask } from './model.js';
+import { users, makeSeed, ensureDemoHistory } from './data.js';
+import { pendingTasks, visibleNotifications, paginateNotifications, unreadCount, needsAction, canOpen, readNotification, archiveNotification, actOnTask } from './model.js';
 import { icon } from './icons.js';
 
 const KEY='saq.notifications.prototype.v1';
@@ -9,7 +9,9 @@ let storageAvailable=true;
 let state;
 try { state=JSON.parse(localStorage.getItem(KEY)); } catch { storageAvailable=false; }
 if(!state||state.schemaVersion!==1||!Array.isArray(state.entities)||!users.some(u=>u.id===state.activeUserId)) state=makeSeed();
-let tab='all', moduleFilter='all', categoryFilter='all', query='', taskTab='incoming', taskQuery='', taskStatus='all', bellOpen=false, bellTab='all', mobileNav=false;
+ensureDemoHistory(state);
+let tab='unread', moduleFilter='all', categoryFilter='all', query='', taskTab='incoming', taskQuery='', taskStatus='all', bellOpen=false, bellTab='unread', mobileNav=false;
+let noticePage=1,noticePageSize=[10,25,50].includes(state.preferences.notificationPageSize)?state.preferences.notificationPageSize:10;
 let sidebarExpanded=false;
 try{sidebarExpanded=localStorage.getItem('saq.notifications.sidebar.expanded')==='true';}catch{}
 let documentOrigin='tasks';
@@ -68,20 +70,19 @@ function shell(content){
 }
 function notificationRow(n,compact=false){
   const task=state.tasks.find(t=>t.id===n.taskId),active=needsAction(state,n),unread=!n.readAt;
-  return `<article class="notification-row ${unread?'unread':''} ${compact?'compact':''}">
+  const link=`<a class="document-link" href="#/document/${n.entityId}" data-action="open-notice" data-id="${n.id}" aria-label="Перейти к документу: ${esc(n.body)}">Перейти ${icon('arrow')}</a>`;
+  return `<article class="notification-row ${unread?'unread':''} ${compact?'compact':''}" data-notice-id="${n.id}">
     <div class="event-icon ${modules[n.module].color}">${icon(n.category==='deadline'?'clock':n.category==='result'?'check':n.category==='revision'?'return':modules[n.module].icon)}</div>
-    <div class="notification-body"><div class="row-labels">${moduleBadge(n.module)}<span class="category-label">${categories[n.category]}</span>${unread?'<span class="unread-dot" aria-label="Непрочитано"></span>':''}</div>
-    <h3 class="notification-title">${esc(notificationTitle(n))}</h3><p class="notification-text">${esc(n.body)}</p>
-    <div class="notification-meta"><span>${esc(person(n.actorId))}</span><span>·</span><time datetime="${n.createdAt}" title="${fullDate(n.createdAt)} (Астана, UTC+5)">${shortDate(n.createdAt)}</time>${n.relatedModule?`<span class="related">Связано с ${modules[n.relatedModule].label}</span>`:''}</div>
-    ${!compact&&task?`<div class="row-status"><span class="state-pill ${active?'pending':''}">${active?'Требует действия':statusNames[task.status]}</span>${active&&task.dueAt?`<span class="due ${isOverdue(task)?'overdue':''}">${icon('clock')}${isOverdue(task)?'Срок истёк':'До'} ${fullDate(task.dueAt)}</span>`:''}</div>`:''}
-    <a class="document-link" href="#/document/${n.entityId}" data-action="open-notice" data-id="${n.id}">Перейти к документу ${icon('arrow')}</a></div>
-    ${!compact?`<div class="row-tools"><button class="icon-button" data-action="toggle-read" data-id="${n.id}" title="${unread?'Отметить прочитанным':'Отметить непрочитанным'}" aria-label="${unread?'Отметить прочитанным':'Отметить непрочитанным'}: ${esc(n.title)}">${icon(unread?'mail':'inbox')}</button><button class="icon-button" data-action="archive" data-id="${n.id}" ${active?'disabled':''} title="${active?'В архив после выполнения поручения':n.archivedAt?'Вернуть из архива':'В архив'}" aria-label="${n.archivedAt?'Вернуть из архива':'В архив'}: ${esc(n.title)}">${icon(n.archivedAt?'return':'archive')}</button></div>`:''}
+    <div class="notification-body"><div class="notification-heading"><h3 class="notification-title">${esc(notificationTitle(n))}</h3>${moduleBadge(n.module)}${unread?'<span class="unread-dot" aria-label="Непрочитано"></span>':''}</div>
+    <details class="notification-message"><summary title="Развернуть или свернуть текст уведомления"><span class="notification-text">${esc(n.body)}</span>${icon('down')}</summary></details>
+    <div class="notification-meta"><span>${esc(person(n.actorId))}</span><span aria-hidden="true">·</span><time datetime="${n.createdAt}" title="${fullDate(n.createdAt)} (Астана, UTC+5)">${shortDate(n.createdAt)}</time>${!compact&&task?`<span class="state-pill ${active?'pending':''}">${active?'Требует действия':statusNames[task.status]}</span>${active&&task.dueAt?`<span class="due ${isOverdue(task)?'overdue':''}">${isOverdue(task)?'Срок истёк':'До'} ${fullDate(task.dueAt)}</span>`:''}`:''}${!compact&&n.relatedModule?`<span class="related">Связано с ${modules[n.relatedModule].label}</span>`:''}${compact?link:''}</div></div>
+    ${!compact?`<div class="notification-actions">${link}<div class="row-tools"><button class="icon-button" data-action="toggle-read" data-id="${n.id}" title="${unread?'Отметить прочитанным':'Отметить непрочитанным'}" aria-label="${unread?'Отметить прочитанным':'Отметить непрочитанным'}: ${esc(n.title)}">${icon(unread?'mail':'inbox')}</button><button class="icon-button" data-action="archive" data-id="${n.id}" ${active?'disabled':''} title="${active?'В архив после выполнения поручения':n.archivedAt?'Вернуть из архива':'В архив'}" aria-label="${n.archivedAt?'Вернуть из архива':'В архив'}: ${esc(n.title)}">${icon(n.archivedAt?'return':'archive')}</button></div></div>`:''}
     </article>`;
 }
 function bellPanel(){
   const all=visibleNotifications(state,user().id).filter(n=>!n.archivedAt);
   const list=all.filter(n=>bellTab==='unread'?!n.readAt:bellTab==='action'?needsAction(state,n):true).slice(0,5);
-  return `<section id="bell-panel" class="bell-panel" aria-label="Последние уведомления"><div class="bell-heading"><h2>Уведомления <span>${unreadCount(state,user().id)}</span></h2><button class="icon-button" data-action="bell-close" aria-label="Закрыть уведомления">${icon('close')}</button></div><div class="bell-tabs">${[['all','Все'],['unread','Непрочитанные'],['action','Требуют действия']].map(([id,label])=>`<button data-action="bell-tab" data-id="${id}" aria-pressed="${bellTab===id}" class="${bellTab===id?'active':''}">${label}</button>`).join('')}</div><div class="bell-feed">${list.length?list.map(n=>notificationRow(n,true)).join(''):'<div class="empty compact-empty">'+icon('check')+'<h3>Здесь пока пусто</h3><p>Подходящих уведомлений нет.</p></div>'}</div><div class="bell-footer"><button data-action="read-all" class="text-button">${icon('double')}Все прочитаны</button><button data-action="all-notices" class="text-button">Все уведомления ${icon('arrow')}</button></div></section>`;
+  return `<section id="bell-panel" class="bell-panel" aria-label="Последние уведомления"><div class="bell-heading"><h2>Уведомления <span>${unreadCount(state,user().id)}</span></h2><button class="icon-button" data-action="bell-close" aria-label="Закрыть уведомления">${icon('close')}</button></div><div class="bell-tabs">${[['unread','Непрочитанные'],['all','Все'],['action','Требуют действия']].map(([id,label])=>`<button data-action="bell-tab" data-id="${id}" aria-pressed="${bellTab===id}" class="${bellTab===id?'active':''}">${label}</button>`).join('')}</div><div class="bell-feed">${list.length?list.map(n=>notificationRow(n,true)).join(''):'<div class="empty compact-empty">'+icon('check')+'<h3>Здесь пока пусто</h3><p>Подходящих уведомлений нет.</p></div>'}</div><div class="bell-footer"><button data-action="read-all" class="text-button">${icon('double')}Все прочитаны</button><button data-action="all-notices" class="text-button">Все уведомления ${icon('arrow')}</button></div></section>`;
 }
 function filters(kind='notifications'){
   return `<div class="filters"><label class="search-field">${icon('search')}<input id="search" type="search" value="${esc(query)}" placeholder="${kind==='catalog'?'Найти событие, получателя или текст…':'Поиск по документу, тексту, отправителю…'}" aria-label="Поиск"></label><label class="filter-select"><select id="module-filter" aria-label="Модуль"><option value="all">Все модули</option>${Object.entries(modules).map(([id,m])=>`<option value="${id}" ${moduleFilter===id?'selected':''}>${m.label}</option>`).join('')}</select></label><label class="filter-select"><select id="category-filter" aria-label="Тип уведомления"><option value="all">Все типы</option>${Object.entries(categories).map(([id,l])=>`<option value="${id}" ${categoryFilter===id?'selected':''}>${l}</option>`).join('')}</select></label>${query||moduleFilter!=='all'||categoryFilter!=='all'?'<button class="text-button" data-action="reset-filters">Сбросить</button>':''}</div>`;
@@ -89,14 +90,25 @@ function filters(kind='notifications'){
 function notificationPage(){
   const all=visibleNotifications(state,user().id);
   return `<div class="page-heading"><div><h2>Уведомления</h2></div><button class="button secondary" data-action="read-all">${icon('double')}Отметить все прочитанными</button></div>${stats()}
-    <section class="panel feed-panel"><div class="tabs">${[['all','Все',all.filter(n=>!n.archivedAt).length],['unread','Непрочитанные',unreadCount(state,user().id)],['action','Требуют действия',all.filter(n=>needsAction(state,n)).length],['archive','Архив',all.filter(n=>n.archivedAt).length]].map(([id,label,count])=>`<button class="${tab===id?'active':''}" data-action="tab" data-id="${id}" aria-pressed="${tab===id}">${label}<span>${count}</span></button>`).join('')}</div>${filters()}<div id="results">${notificationResults()}</div></section><div class="page-footnote">${icon('shield')}Доступны только сообщения, адресованные выбранному пользователю. Время — Астана, UTC+5.</div>`;
+    <section class="panel feed-panel"><div class="tabs">${[['unread','Непрочитанные',unreadCount(state,user().id)],['all','Все',all.filter(n=>!n.archivedAt).length],['action','Требуют действия',all.filter(n=>needsAction(state,n)).length],['archive','Архив',all.filter(n=>n.archivedAt).length]].map(([id,label,count])=>`<button class="${tab===id?'active':''}" data-action="tab" data-id="${id}" aria-pressed="${tab===id}">${label}<span>${count}</span></button>`).join('')}</div>${filters()}<div id="results">${notificationResults()}</div></section><div class="page-footnote">${icon('shield')}Доступны только сообщения, адресованные выбранному пользователю. Время — Астана, UTC+5.</div>`;
 }
 function notificationResults(){
   const list=visibleNotifications(state,user().id).filter(n=>tab==='archive'?n.archivedAt:!n.archivedAt).filter(n=>tab==='unread'?!n.readAt:tab==='action'?needsAction(state,n):true)
     .filter(n=>(moduleFilter==='all'||n.module===moduleFilter)&&(categoryFilter==='all'||n.category===categoryFilter))
-    .filter(n=>`${n.title} ${n.body} ${person(n.actorId)}`.toLowerCase().includes(query.toLowerCase()));
-  if(!list.length)return empty('Уведомлений не найдено','Попробуйте изменить фильтры или выберите другую тестовую роль.');
-  let last='';return list.map(n=>{const group=shortDate(n.createdAt).split(',')[0];const heading=group!==last?`<div class="date-group">${group}</div>`:'';last=group;return heading+notificationRow(n);}).join('');
+    .filter(n=>`${notificationTitle(n)} ${n.title} ${n.body} ${person(n.actorId)}`.toLocaleLowerCase('ru').includes(query.trim().toLocaleLowerCase('ru')));
+  const result=paginateNotifications(list,noticePage,noticePageSize);
+  noticePage=result.page;
+  const content=result.total?result.items.map(n=>notificationRow(n)).join(''):empty(tab==='unread'&&!query&&moduleFilter==='all'&&categoryFilter==='all'?'Непрочитанных уведомлений нет':'Уведомлений не найдено','Прочитанные сообщения доступны во вкладке «Все». Поиск и фильтры применяются к выбранной вкладке.');
+  return `<div id="notification-list" tabindex="-1" aria-label="Список уведомлений">${content}</div>${notificationPagination(result)}`;
+}
+function notificationPagination({page,total,totalPages,from,to}){
+  const pages=[...new Set([1,totalPages,...Array.from({length:5},(_,i)=>page+i-2).filter(p=>p>0&&p<=totalPages)])].sort((a,b)=>a-b);
+  const numbers=pages.map((p,i)=>`${i&&p-pages[i-1]>1?'<span class="pagination-gap" aria-hidden="true">…</span>':''}<button data-action="notice-page" data-id="${p}" ${p===page?'aria-current="page"':''} aria-label="Страница ${p}">${p}</button>`).join('');
+  return `<div class="notification-pagination"><p class="pagination-range" role="status" aria-live="polite">${total?`${from}–${to} из ${total}`:'0 уведомлений'}</p><label class="page-size">На странице <select id="notice-page-size" aria-label="Уведомлений на странице">${[10,25,50].map(n=>`<option value="${n}" ${noticePageSize===n?'selected':''}>${n}</option>`).join('')}</select></label>${totalPages>1?`<nav class="pagination-pages" aria-label="Страницы уведомлений"><button data-action="notice-page" data-id="${page-1}" aria-label="Предыдущая страница" ${page===1?'disabled':''}>${icon('back')}</button>${numbers}<button data-action="notice-page" data-id="${page+1}" aria-label="Следующая страница" ${page===totalPages?'disabled':''}>${icon('arrow')}</button></nav>`:''}</div>`;
+}
+function refreshNoticePage(focus=false){
+  document.querySelector('#results').innerHTML=notificationResults();
+  if(focus){const list=document.querySelector('#notification-list');list.focus({preventScroll:true});document.querySelector('.feed-panel').scrollIntoView({block:'start'});}
 }
 const empty=(title,subtitle)=>`<div class="empty">${icon('inbox')}<h3>${title}</h3><p>${subtitle}</p></div>`;
 const taskActionLabels={approve:'Согласовать','approve-final':'Утвердить',acknowledge:'Ознакомиться','review-selection':'Рассмотреть результаты СУР',review:'Рассмотреть',respond:'Подготовить ответ',revise:'Доработать документ',attendance:'Подтвердить участие'};
@@ -202,11 +214,12 @@ document.addEventListener('click',event=>{
   if(action==='bell-tab'){bellTab=id;render();}
   if(action==='mobile-menu'){mobileNav=!mobileNav;render();}
   if(action==='sidebar-toggle'){sidebarExpanded=!sidebarExpanded;try{localStorage.setItem('saq.notifications.sidebar.expanded',String(sidebarExpanded));}catch{}render();}
-  if(action==='all-notices'){tab='all';navigate('notifications');}
+  if(action==='all-notices'){tab='all';noticePage=1;moduleFilter='all';categoryFilter='all';query='';navigate('notifications');}
   if(action==='go-tasks'){taskTab='incoming';navigate('tasks');}
-  if(action==='tab'){tab=id;render();}
+  if(action==='tab'){tab=id;noticePage=1;render();}
+  if(action==='notice-page'){noticePage=Number(id);refreshNoticePage(true);}
   if(action==='task-tab'){taskTab=id;taskStatus='all';render();}
-  if(action==='reset-filters'){moduleFilter='all';categoryFilter='all';query='';render();}
+  if(action==='reset-filters'){moduleFilter='all';categoryFilter='all';query='';noticePage=1;render();}
   if(action==='open-notice'){const n=state.notifications.find(n=>n.id===id&&n.recipientId===user().id);if(n)openEntity(n.entityId,n.id);}
   if(action==='open-task'){const t=state.tasks.find(t=>t.id===id);if(t)openEntity(t.entityId);}
   if(action==='toggle-read'){const n=state.notifications.find(n=>n.id===id&&n.recipientId===user().id);if(n)n.readAt=n.readAt?null:new Date().toISOString();save();render();}
@@ -220,17 +233,18 @@ document.addEventListener('click',event=>{
 });
 document.addEventListener('submit',event=>{
   if(event.target.id==='decision-form'){event.preventDefault();perform(event.target.dataset.task,event.target.dataset.decision,new FormData(event.target).get('comment')||'');}
-  if(event.target.id==='reset-form'){event.preventDefault();state=makeSeed();save();document.querySelector('#decision-dialog').close();tab='all';moduleFilter='all';categoryFilter='all';query='';navigate('notifications');notify('Примеры восстановлены.');}
+  if(event.target.id==='reset-form'){event.preventDefault();state=makeSeed();save();document.querySelector('#decision-dialog').close();tab='unread';bellTab='unread';noticePage=1;noticePageSize=10;moduleFilter='all';categoryFilter='all';query='';navigate('notifications');notify('Примеры восстановлены.');}
 });
 document.addEventListener('change',event=>{
   const el=event.target;
-  if(el.id==='persona'){state.activeUserId=el.value;save();tab='all';taskTab='incoming';taskQuery='';taskStatus='all';moduleFilter='all';categoryFilter='all';query='';bellOpen=false;navigate(page()==='tasks'?'tasks':'notifications');}
+  if(el.id==='persona'){state.activeUserId=el.value;save();tab='unread';bellTab='unread';noticePage=1;taskTab='incoming';taskQuery='';taskStatus='all';moduleFilter='all';categoryFilter='all';query='';bellOpen=false;navigate(page()==='tasks'?'tasks':'notifications');}
   if(el.id==='task-status'){taskStatus=el.value;document.querySelector('#task-results').innerHTML=taskResults();}
-  if(el.id==='module-filter'){moduleFilter=el.value;render();}
-  if(el.id==='category-filter'){categoryFilter=el.value;render();}
+  if(el.id==='module-filter'){moduleFilter=el.value;noticePage=1;render();}
+  if(el.id==='category-filter'){categoryFilter=el.value;noticePage=1;render();}
+  if(el.id==='notice-page-size'){noticePageSize=[10,25,50].includes(Number(el.value))?Number(el.value):10;noticePage=1;state.preferences.notificationPageSize=noticePageSize;save();refreshNoticePage();document.querySelector('#notice-page-size').focus({preventScroll:true});}
   if(el.matches('.selection-check')){const reason=document.querySelector(`.selection-reason[data-id="${el.dataset.id}"]`);reason.disabled=el.checked;if(!el.checked)reason.focus();}
 });
-document.addEventListener('input',event=>{if(event.target.id==='task-search'){taskQuery=event.target.value;document.querySelector('#task-results').innerHTML=taskResults();}if(event.target.id==='search'){query=event.target.value;document.querySelector('#results').innerHTML=page()==='catalog'?catalogResults():notificationResults();}});
+document.addEventListener('input',event=>{if(event.target.id==='task-search'){taskQuery=event.target.value;document.querySelector('#task-results').innerHTML=taskResults();}if(event.target.id==='search'){query=event.target.value;noticePage=1;document.querySelector('#results').innerHTML=page()==='catalog'?catalogResults():notificationResults();}});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&(bellOpen||mobileNav)){bellOpen=false;mobileNav=false;render();document.querySelector('#bell-button')?.focus();}});
 window.addEventListener('hashchange',()=>{bellOpen=false;mobileNav=false;render();window.scrollTo(0,0);});
 window.addEventListener('storage',event=>{if(event.key===KEY&&event.newValue){try{const next=JSON.parse(event.newValue);if(next.schemaVersion===1){state={...next,activeUserId:state.activeUserId};render();}}catch{ /* keep current usable session */ }}});

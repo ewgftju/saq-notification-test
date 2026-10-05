@@ -1,5 +1,13 @@
 export const pendingTasks = (state,userId) => state.tasks.filter(t=>t.recipientId===userId && t.status==='pending');
-export const visibleNotifications = (state,userId) => state.notifications.filter(n=>n.recipientId===userId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+export const visibleNotifications = (state,userId) => state.notifications.filter(n=>n.recipientId===userId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id));
+// Filter before calling this helper. Clamp after reading/archiving the last item.
+export function paginateNotifications(list,page=1,pageSize=10) {
+  const size=[10,25,50].includes(Number(pageSize))?Number(pageSize):10;
+  const total=list.length,totalPages=Math.max(1,Math.ceil(total/size));
+  const current=Math.min(totalPages,Math.max(1,Math.trunc(Number(page))||1));
+  const start=(current-1)*size;
+  return {items:list.slice(start,start+size),page:current,pageSize:size,total,totalPages,from:total?start+1:0,to:Math.min(start+size,total)};
+}
 export const unreadCount = (state,userId) => visibleNotifications(state,userId).filter(n=>!n.readAt&&!n.archivedAt).length;
 export const canOpen = (state,entityId,userId) => Boolean(state.entities.find(e=>e.id===entityId)?.allowedUserIds.includes(userId));
 export function needsAction(state,notification) {

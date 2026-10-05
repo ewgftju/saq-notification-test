@@ -93,8 +93,8 @@ dialog{border:1px solid #d2d7e3;border-radius:8px;padding:24px;width:min(520px,c
 .deadline-badge{display:inline-flex;align-items:center;flex-wrap:wrap;gap:3px 5px;padding:3px 7px;border:1px solid #edcb8d;border-radius:4px;background:#fff6df;color:#805200;font-size:11px;font-weight:600;line-height:17px;font-variant-numeric:tabular-nums}
 .deadline-badge time{white-space:nowrap}
 .deadline-badge.overdue{border-color:#efaaa5;background:#fff0ef;color:#b42318}
-.stats-line .overdue-summary{padding:3px 7px;border:1px solid #efaaa5;border-radius:4px;background:#fff0ef;color:#b42318;font-weight:600}
-.stats-line .overdue-summary strong{color:inherit}
+.stats-line .overdue-summary{color:#b42318;font-weight:400}
+.stats-line [data-overdue-count]{font:inherit;color:inherit}
 .saq-workflow-table .deadline-badge{display:flex;width:fit-content;margin-top:6px}
 .document-route-meta .deadline-badge{font-size:12px}
 .compact .deadline-badge{font-size:10px;line-height:16px;padding:2px 6px}

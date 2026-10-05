@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeSeed } from '../data.js';
 import { catalog } from '../catalog.js';
-import { pendingTasks, visibleNotifications, unreadCount, needsAction, canOpen, readNotification, addNotification, actOnTask } from '../model.js';
+import { isTaskOverdue, pendingTasks, visibleNotifications, unreadCount, needsAction, canOpen, readNotification, addNotification, actOnTask } from '../model.js';
 const seed=()=>makeSeed(new Date('2026-10-05T04:00:00Z'));
 const at='2026-10-05T05:00:00Z';
 
@@ -135,4 +135,17 @@ test('Adding demo history preserves decisions, read state and assignments',async
   assert.deepEqual(s.tasks,tasks);assert.equal(s.notifications.length,count);
   assert.equal(s.notifications.find(n=>n.id==='notice-demo-history-01').readAt,at);
   assert.ok(s.notifications.filter(n=>n.id.startsWith('notice-demo-history-')).every(n=>canOpen(s,n.entityId,n.recipientId)));
+});
+
+test('Deadline alert depends on an unfinished action, not on notification read status',()=>{
+  const s=seed(),task=s.tasks.find(t=>t.id==='task-obj-request'),now=Date.parse(at);
+  assert.equal(isTaskOverdue(task,now),true);
+  readNotification(s,'notice-obj-request','reviewer',at);
+  assert.equal(isTaskOverdue(task,now),true);
+  const completed=actOnTask(s,task.id,'reviewer','approve','',{},at);
+  assert.equal(isTaskOverdue(completed.tasks.find(t=>t.id===task.id),now),false);
+  for(const status of ['waiting','cancelled','returned','rejected'])assert.equal(isTaskOverdue({...task,status},now),false);
+  assert.equal(isTaskOverdue({...task,dueAt:null},now),false);
+  assert.equal(isTaskOverdue({...task,dueAt:at},now-1),false);
+  assert.equal(isTaskOverdue({...task,dueAt:at},now),true);
 });

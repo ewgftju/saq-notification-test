@@ -1,6 +1,6 @@
 import { modules, categories, catalog } from './catalog.js';
 import { users, makeSeed, ensureDemoHistory } from './data.js';
-import { isDemoSuperuser, pendingTasks, visibleNotifications, paginateNotifications, unreadCount, needsAction, canOpen, readNotification, actOnTask } from './model.js';
+import { isTaskOverdue, isDemoSuperuser, pendingTasks, visibleNotifications, paginateNotifications, unreadCount, needsAction, canOpen, readNotification, actOnTask } from './model.js';
 import { icon } from './icons.js';
 
 const KEY='saq.notifications.prototype.v1';
@@ -34,7 +34,22 @@ const shortDate=(value)=>{
   const time=new Intl.DateTimeFormat('ru-RU',{timeZone:'Asia/Almaty',hour:'2-digit',minute:'2-digit'}).format(d);
   return `${same?'Сегодня':yesterday?'Вчера':day(d)}, ${time}`;
 };
-const isOverdue=t=>t.status==='pending'&&t.dueAt&&new Date(t.dueAt)<new Date();
+const isOverdue=isTaskOverdue;
+function deadlineBadge(task){
+  if(!task||task.status!=='pending'||!task.dueAt||!Number.isFinite(Date.parse(task.dueAt)))return '';
+  return `<span class="deadline-badge ${isOverdue(task)?'overdue':''}" data-deadline-task="${esc(task.id)}" title="Срок поручения: ${esc(person(task.recipientId))}. Время — Астана, UTC+5"><span class="deadline-label">${isOverdue(task)?'Срок истёк:':'Срок:'}</span> <time datetime="${task.dueAt}">${fullDate(task.dueAt)}</time></span>`;
+}
+function refreshDeadlines(){
+  for(const badge of document.querySelectorAll('[data-deadline-task]')){
+    const task=state.tasks.find(t=>t.id===badge.dataset.deadlineTask);
+    if(!task||task.status!=='pending'||!task.dueAt){badge.remove();continue;}
+    const overdue=isOverdue(task);
+    badge.classList.toggle('overdue',overdue);
+    badge.querySelector('.deadline-label').textContent=overdue?'Срок истёк:':'Срок:';
+  }
+  const counter=document.querySelector('[data-overdue-count]');
+  if(counter){const count=pendingTasks(state,user().id).filter(t=>isOverdue(t)).length;counter.textContent=count;counter.parentElement.classList.toggle('overdue-summary',count>0);}
+}
 const actionNames={approve:'Согласование','approve-final':'Утверждение',acknowledge:'Ознакомление','review-selection':'Рассмотрение отбора',review:'Рассмотрение',respond:'Подготовка ответа',revise:'Доработка',attendance:'Подтверждение участия'};
 const statusNames={pending:'Требует действия',completed:'Выполнено',returned:'Возвращено',rejected:'Отклонено',cancelled:'Отменено',waiting:'Ожидает этапа'};
 const moduleBadge=(id)=>`<span class="module-badge">${esc(modules[id]?.label || 'Все модули')}</span>`;
@@ -50,7 +65,7 @@ function openEntity(entityId,noticeId){
 }
 function stats(){
   const tasks=pendingTasks(state,user().id);
-  return `<div class="stats-line"><span>${icon('mail')}<strong>${unreadCount(state,user().id)}</strong> непрочитанных</span><span>${icon('clock')}<strong>${tasks.filter(isOverdue).length}</strong> просрочено</span></div>`;
+  return `<div class="stats-line"><span>${icon('mail')}<strong>${unreadCount(state,user().id)}</strong> непрочитанных</span><span class="${tasks.some(t=>isOverdue(t))?'overdue-summary':''}">${icon('clock')}<strong data-overdue-count>${tasks.filter(t=>isOverdue(t)).length}</strong> просрочено</span></div>`;
 }
 const moduleNames={sur:'Система управления рисками',evga:'Внутренний государственный аудит',sva:'Служба внутреннего аудита',prof:'Профилактический контроль',objections:'Возражения'};
 function currentEntity(){return state.entities.find(e=>e.id===decodeURIComponent(location.hash.split('/')[2]?.split('?')[0]||''));}
@@ -79,7 +94,7 @@ function notificationRow(n,compact=false){
   return `<article class="notification-row ${unread?'unread':''} ${compact?'compact':''}" data-notice-id="${n.id}">
     <div class="notification-body"><div class="notification-heading"><h3 class="notification-title">${esc(notificationTitle(n))}</h3>${moduleBadge(n.module)}${unread?'<span class="unread-dot" aria-label="Непрочитано"></span>':''}</div>
     <details class="notification-message"><summary title="Развернуть или свернуть текст уведомления"><span class="notification-text">${esc(n.body)}</span>${icon('down')}</summary></details>
-    <div class="notification-meta"><span>${esc(person(n.actorId))}</span><span aria-hidden="true">·</span><time datetime="${n.createdAt}" title="${fullDate(n.createdAt)} (Астана, UTC+5)">${shortDate(n.createdAt)}</time>${!compact&&task?`${active&&task.dueAt?`<span class="due ${isOverdue(task)?'overdue':''}">${isOverdue(task)?'Срок истёк':'До'} ${fullDate(task.dueAt)}</span>`:''}`:''}${!compact&&n.relatedModule?`<span class="related">Связано с ${modules[n.relatedModule].label}</span>`:''}${compact?link:''}</div></div>
+    <div class="notification-meta"><span>${esc(person(n.actorId))}</span><span aria-hidden="true">·</span><time datetime="${n.createdAt}" title="${fullDate(n.createdAt)} (Астана, UTC+5)">${shortDate(n.createdAt)}</time>${active?deadlineBadge(task):''}${!compact&&n.relatedModule?`<span class="related">Связано с ${modules[n.relatedModule].label}</span>`:''}${compact?link:''}</div></div>
     ${!compact?`<div class="notification-actions">${link}<div class="row-tools"><button class="icon-button" data-action="toggle-read" data-id="${n.id}" title="${unread?'Отметить прочитанным':'Отметить непрочитанным'}" aria-label="${unread?'Отметить прочитанным':'Отметить непрочитанным'}: ${esc(n.title)}">${icon(unread?'mail':'inbox')}</button></div></div>`:''}
     </article>`;
 }
@@ -145,7 +160,7 @@ function taskResults(){
     const t=taskTab==='incoming'?item:item.first,e=state.entities.find(e=>e.id===t.entityId);
     const comment=taskTab==='sent'?[...item.tasks].reverse().find(t=>t.comment&&['returned','rejected'].includes(t.status))?.comment:e.history.slice().reverse().find(h=>h.comment)?.comment;
     const participants=taskTab==='sent'?[...new Set(item.tasks.filter(t=>t.status==='pending').length?item.tasks.filter(t=>t.status==='pending').map(t=>t.recipientId):item.tasks.map(t=>t.recipientId))].map(person).join('; '):person(t.authorId);
-    return `<tr><td>${documentCell(e,t)}${comment&&((taskTab==='incoming'&&t.action==='revise')||(taskTab==='sent'&&['На доработке','Отклонено'].includes(routeState(item))))?`<span class="saq-workflow-comment"><strong>Причина:</strong> ${esc(comment)}</span>`:''}</td><td class="saq-workflow-participants">${esc(participants)}</td><td>${taskTab==='incoming'?`${taskActionLabels[t.action]}<span class="saq-workflow-cell-detail">Ожидает решения</span>${t.dueAt?`<span class="saq-workflow-cell-detail ${isOverdue(t)?'danger-text':''}">${isOverdue(t)?'Срок истёк:':'До'} ${fullDate(t.dueAt)}</span>`:''}`:routeState(item)}</td><td><time datetime="${t.createdAt}">${fullDate(t.createdAt)}</time></td><td><a class="task-open" href="#/document/${e.id}" data-action="open-task" data-id="${t.id}" aria-label="Перейти к документу: ${esc(e.title)}">Перейти ${icon('arrow')}</a></td></tr>`;
+    return `<tr><td>${documentCell(e,t)}${comment&&((taskTab==='incoming'&&t.action==='revise')||(taskTab==='sent'&&['На доработке','Отклонено'].includes(routeState(item))))?`<span class="saq-workflow-comment"><strong>Причина:</strong> ${esc(comment)}</span>`:''}</td><td class="saq-workflow-participants">${esc(participants)}</td><td>${taskTab==='incoming'?`${taskActionLabels[t.action]}<span class="saq-workflow-cell-detail">Ожидает решения</span>${deadlineBadge(t)}`:routeState(item)+deadlineBadge(item.tasks.filter(t=>t.status==='pending'&&t.dueAt).sort((a,b)=>Date.parse(a.dueAt)-Date.parse(b.dueAt))[0])}</td><td><time datetime="${t.createdAt}">${fullDate(t.createdAt)}</time></td><td><a class="task-open" href="#/document/${e.id}" data-action="open-task" data-id="${t.id}" aria-label="Перейти к документу: ${esc(e.title)}">Перейти ${icon('arrow')}</a></td></tr>`;
   }).join('')}</tbody></table></div>`}`;
 }
 function documentPage(){
@@ -157,7 +172,7 @@ function documentPage(){
   const waiting=state.tasks.find(t=>t.entityId===id&&(isDemoSuperuser(user().id)||t.recipientId===user().id)&&t.status==='waiting');
   return `<div class="document-navigation">${back}<div class="breadcrumb">${esc(moduleNames[entity.module])}<span>/</span>Документы<span>/</span>№ ${esc(entity.number)}</div></div>
   <div class="document-layout"><section class="panel document-panel" aria-label="Документ ${esc(entity.title)}"><header class="document-toolbar"><div><strong>${esc(entity.title)}</strong><span>Редакция ${esc(entity.version)} · ${esc(entity.status)}</span></div>${task?`<div class="document-actions">${taskButtons(task)}</div>`:''}</header>
-  ${task?`<div class="document-route-meta"><span>Инициатор: ${esc(person(task.authorId))}</span><span>${actionNames[task.action]}</span>${task.dueAt?`<span class="${isOverdue(task)?'danger-text':''}">${isOverdue(task)?'Срок истёк:':'Срок:'} ${fullDate(task.dueAt)}</span>`:''}</div>`:`<p class="document-route-meta">${waiting?'Ожидается завершение предыдущего этапа согласования.':'Документ открыт для просмотра. Действий от вас не требуется.'}</p>`}
+  ${task?`<div class="document-route-meta"><span>Инициатор: ${esc(person(task.authorId))}</span><span>${actionNames[task.action]}</span>${deadlineBadge(task)}</div>`:`<p class="document-route-meta">${waiting?'Ожидается завершение предыдущего этапа согласования.':'Документ открыт для просмотра. Действий от вас не требуется.'}</p>`}
   ${task?.action==='acknowledge'?'<p class="document-ack-note">Ознакомление подтверждается отдельной кнопкой в документе.</p>':''}
   <article class="document-sheet"><h2>${esc(entity.title)}</h2><p class="document-number">№ ${esc(entity.number)}</p><dl class="document-meta"><div><dt>Организация</dt><dd>${esc(entity.organization)}</dd></div><div><dt>Инициатор</dt><dd>${esc(person(entity.authorId))}</dd></div><div><dt>Редакция</dt><dd>${esc(entity.version)}</dd></div><div><dt>Состояние</dt><dd>${esc(entity.status)}</dd></div></dl><p class="document-content">${esc(entity.content)}</p>${entity.kind==='selection'?selectionTable(entity,Boolean(task)):''}${entity.response?`<div class="notice"><strong>Ответ адресата</strong><p>${esc(entity.response)}</p></div>`:''}<p class="document-demo-note">Демонстрационная форма документа · ${esc(moduleNames[entity.module])}</p></article></section>
   <aside class="panel history-panel"><h2>История документа</h2><ol>${[...entity.history].reverse().map(h=>`<li><strong>${esc(h.text)}</strong><span>${esc(person(h.actorId))}</span><time>${shortDate(h.at)}</time>${h.comment?`<p>${esc(h.comment)}</p>`:''}</li>`).join('')}</ol></aside></div>`;
@@ -248,6 +263,8 @@ document.addEventListener('change',event=>{
 });
 document.addEventListener('input',event=>{if(event.target.id==='task-search'){taskQuery=event.target.value;document.querySelector('#task-results').innerHTML=taskResults();}if(event.target.id==='search'){query=event.target.value;noticePage=1;document.querySelector('#results').innerHTML=page()==='catalog'?catalogResults():notificationResults();}});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&(bellOpen||mobileNav)){bellOpen=false;mobileNav=false;render();document.querySelector('#bell-button')?.focus();}});
+setInterval(refreshDeadlines,30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDeadlines();});
 window.addEventListener('hashchange',()=>{bellOpen=false;mobileNav=false;render();window.scrollTo(0,0);});
 window.addEventListener('storage',event=>{if(event.key===KEY&&event.newValue){try{const next=JSON.parse(event.newValue);if(next.schemaVersion===1){state={...next,activeUserId:state.activeUserId};render();}}catch{ /* keep current usable session */ }}});
 render();

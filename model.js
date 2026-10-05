@@ -1,3 +1,6 @@
+export function isTaskOverdue(task,now=Date.now()) {
+  return Boolean(task?.status==='pending'&&task.dueAt&&Date.parse(task.dueAt)<=Number(now));
+}
 export const isDemoSuperuser = userId => userId === 'saq-demo-superuser';
 export const pendingTasks = (state,userId) => state.tasks.filter(t=>(isDemoSuperuser(userId)||t.recipientId===userId) && t.status==='pending');
 export const visibleNotifications = (state,userId) => state.notifications.filter(n=>(isDemoSuperuser(userId)||n.recipientId===userId)).sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id));

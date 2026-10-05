@@ -9,6 +9,7 @@ export const users = [
   {id:'quality',name:'С. Ахметова',role:'Эксперт контроля качества',org:'Управление КК',initials:'СА'},
   {id:'commission',name:'Б. Исаев',role:'Член комиссии',org:'Апелляционная комиссия',initials:'БИ'},
   {id:'secretary',name:'Р. Асанова',role:'Исполнитель рабочего органа',org:'Рассмотрение возражений',initials:'РА'},
+  {id:'saq-demo-superuser',name:'Демо-суперпользователь',role:'Все действия · демо',org:'SAQ · демо',initials:'СУ'},
 ];
 
 // All people, identifiers and organisations in this prototype are fictional.

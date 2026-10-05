@@ -1,6 +1,6 @@
 import { modules, categories, catalog } from './catalog.js';
 import { users, makeSeed, ensureDemoHistory } from './data.js';
-import { pendingTasks, visibleNotifications, paginateNotifications, unreadCount, needsAction, canOpen, readNotification, actOnTask } from './model.js';
+import { isDemoSuperuser, pendingTasks, visibleNotifications, paginateNotifications, unreadCount, needsAction, canOpen, readNotification, actOnTask } from './model.js';
 import { icon } from './icons.js';
 
 const KEY='saq.notifications.prototype.v1';
@@ -10,6 +10,11 @@ let state;
 try { state=JSON.parse(localStorage.getItem(KEY)); } catch { storageAvailable=false; }
 if(!state||state.schemaVersion!==1||!Array.isArray(state.entities)||!users.some(u=>u.id===state.activeUserId)) state=makeSeed();
 ensureDemoHistory(state);
+const identityUrl=new URL(location.href);
+if(identityUrl.searchParams.get('demoUser')==='saq-demo-superuser') {
+  state.activeUserId='saq-demo-superuser';
+  identityUrl.searchParams.delete('demoUser');history.replaceState(history.state,'',identityUrl);
+}
 let tab='unread', moduleFilter='all', categoryFilter='all', query='', taskTab='incoming', taskQuery='', taskStatus='all', bellOpen=false, bellTab='unread', mobileNav=false;
 let noticePage=1,noticePageSize=[10,25,50].includes(state.preferences.notificationPageSize)?state.preferences.notificationPageSize:10;
 let sidebarExpanded=false;
@@ -149,8 +154,8 @@ function documentPage(){
   const backLabel=documentOrigin==='tasks'?'К поручениям':'К уведомлениям';
   const back=`<a href="#/${documentOrigin}" class="text-button back-link">${icon('back')}${backLabel}</a>`;
   if(!entity||!canOpen(state,id,user().id))return `${back}<section class="panel">${empty('Документ недоступен','Возможно, документ удалён или ваши права изменились. Обратитесь к отправителю.')}</section>`;
-  const task=state.tasks.find(t=>t.entityId===id&&t.recipientId===user().id&&t.status==='pending');
-  const waiting=state.tasks.find(t=>t.entityId===id&&t.recipientId===user().id&&t.status==='waiting');
+  const task=state.tasks.find(t=>t.entityId===id&&(isDemoSuperuser(user().id)||t.recipientId===user().id)&&t.status==='pending');
+  const waiting=state.tasks.find(t=>t.entityId===id&&(isDemoSuperuser(user().id)||t.recipientId===user().id)&&t.status==='waiting');
   return `<div class="document-navigation">${back}<div class="breadcrumb">${esc(moduleNames[entity.module])}<span>/</span>Документы<span>/</span>№ ${esc(entity.number)}</div></div>
   <div class="document-layout"><section class="panel document-panel" aria-label="Документ ${esc(entity.title)}"><header class="document-toolbar"><div><strong>${esc(entity.title)}</strong><span>Редакция ${esc(entity.version)} · ${esc(entity.status)}</span></div>${task?`<div class="document-actions">${taskButtons(task)}</div>`:''}</header>
   ${task?`<div class="document-route-meta"><span>Инициатор: ${esc(person(task.authorId))}</span><span>${actionNames[task.action]}</span>${task.dueAt?`<span class="${isOverdue(task)?'danger-text':''}">${isOverdue(task)?'Срок истёк:':'Срок:'} ${fullDate(task.dueAt)}</span>`:''}</div>`:`<p class="document-route-meta">${waiting?'Ожидается завершение предыдущего этапа согласования.':'Документ открыт для просмотра. Действий от вас не требуется.'}</p>`}
@@ -219,9 +224,9 @@ document.addEventListener('click',event=>{
   if(action==='notice-page'){noticePage=Number(id);refreshNoticePage(true);}
   if(action==='task-tab'){taskTab=id;taskStatus='all';render();}
   if(action==='reset-filters'){moduleFilter='all';categoryFilter='all';query='';noticePage=1;render();}
-  if(action==='open-notice'){const n=state.notifications.find(n=>n.id===id&&n.recipientId===user().id);if(n)openEntity(n.entityId,n.id);}
+  if(action==='open-notice'){const n=state.notifications.find(n=>n.id===id&&(isDemoSuperuser(user().id)||n.recipientId===user().id));if(n)openEntity(n.entityId,n.id);}
   if(action==='open-task'){const t=state.tasks.find(t=>t.id===id);if(t)openEntity(t.entityId);}
-  if(action==='toggle-read'){const n=state.notifications.find(n=>n.id===id&&n.recipientId===user().id);if(n)n.readAt=n.readAt?null:new Date().toISOString();save();render();}
+  if(action==='toggle-read'){const n=state.notifications.find(n=>n.id===id&&(isDemoSuperuser(user().id)||n.recipientId===user().id));if(n)n.readAt=n.readAt?null:new Date().toISOString();save();render();}
   if(action==='read-all'){const now=new Date().toISOString();visibleNotifications(state,user().id).forEach(n=>n.readAt ||= now);save();render();notify('Уведомления отмечены прочитанными. Открытые поручения сохранены.');}
   if(action==='decision'&&page()==='document'&&state.tasks.find(t=>t.id===id)?.entityId===currentEntity()?.id)decisionDialog(id,decision);
   if(action==='close-dialog')document.querySelector('#decision-dialog').close();

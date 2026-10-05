@@ -1,10 +1,13 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-const css=await readFile('styles.css','utf8');
+const css=(await readFile('styles.css','utf8'))+'\n'+(await readFile('workflow.css','utf8'));
 let code='';
 for(const path of ['catalog.js','icons.js','data.js','model.js','app.js']){
   code+=(await readFile(path,'utf8')).replace(/^import .*;\s*$/gm,'').replace(/^export /gm,'')+'\n';
 }
 let html=await readFile('index.html','utf8');
+const logo=(await readFile('saq-logo.png')).toString('base64');
+code=code.replaceAll('./saq-logo.png',`data:image/png;base64,${logo}`);
+html=html.replace('<link rel="stylesheet" href="./workflow.css">','');
 const svg=await readFile('favicon.svg','utf8');
 html=html.replace('href="./favicon.svg"',`href="data:image/svg+xml,${encodeURIComponent(svg)}"`)
   .replace('<link rel="stylesheet" href="./styles.css">',`<style>${css}</style>`)
